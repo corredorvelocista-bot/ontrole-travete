@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Controle de Travete</title>
+    
+    <!-- Configurações de PWA para celular -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121212">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #4caf50;
+            --accent-hover: #45a049;
+            --border-color: #333;
+            --danger-color: #cf6679;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 4px;
+            color: #fff;
+        }
+
+        p.subtitle {
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-bottom: 6px;
+        }
+
+        input[type="number"], textarea {
+            width: 100%;
+            padding: 12px;
+            background-color: #2c2c2c;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1rem;
+            box-sizing: border-box;
+            margin-bottom: 12px;
+        }
+
+        textarea {
+            resize: vertical;
+            height: 110px;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .result-box {
+            background-color: #252525;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+            font-size: 0.95rem;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .result-box span {
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        ul {
+            padding-left: 20px;
+            margin: 6px 0;
+            font-size: 0.85rem;
+            color: #ccc;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .btn-clear {
+            background-color: transparent;
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+            margin-top: 10px;
+            font-size: 0.85rem;
+            padding: 10px;
+        }
+
+        .btn-clear:hover {
+            background-color: rgba(207, 102, 121, 0.1);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Controle de Travete</h1>
+    <p class="subtitle">Bloco de notas com cálculo e fechamento</p>
+
+    <!-- Bloco de Lançamento -->
+    <div class="card">
+        <label for="valorUnitario">Valor Unitário (R$)</label>
+        <input type="number" id="valorUnitario" step="0.01" value="0.21">
+
+        <label for="textoProducao">Lançamento do Dia</label>
+        <textarea id="textoProducao" placeholder="Ex: 
+251 calças cliente patricia
+95 short
+45 bermudas cliente evolution"></textarea>
+
+        <button onclick="processarLancamento()">Salvar Lançamento</button>
+
+        <div id="previewResult" class="result-box" style="display:none;">
+            <div>Total de Peças: <span id="previewPecas">0</span></div>
+            <div>Total a Receber: <span id="previewValor">R$ 0,00</span></div>
+        </div>
+    </div>
+
+    <!-- Fechamento Semanal -->
+    <div class="card">
+        <h3 style="margin-top:0; font-size: 1.1rem;">Fechamento Semanal</h3>
+        <div id="listaHistorico">
+            <p style="color: #777; font-size: 0.9rem;">Nenhum lançamento registrado.</p>
+        </div>
+        
+        <div style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 12px; font-size: 1rem;">
+            <strong>Total Geral:</strong> <span id="totalGeralValor" style="color: var(--accent-color); font-size: 1.15rem; font-weight: bold;">R$ 0,00</span> (<span id="totalGeralPecas">0</span> pçs)
+        </div>
+
+        <button class="btn-clear" onclick="limparHistorico()">Zerar Semana</button>
+    </div>
+</div>
+
+<script>
+    // Sintetizador de Som Simples (Bip de Confirmação usando Web Audio API)
+    function tocarSomSucesso() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // Nota D5
+            osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1); // Sobe para A5
+            
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.15);
+        } catch (e) {
+            console.log("Áudio não suportado ou bloqueado pelo navegador.");
+        }
+    }
+
+    let historico = JSON.parse(localStorage.getItem('producao_travete')) || [];
+    atualizarTela();
+
+    function processarLancamento() {
+        const texto = document.getElementById('textoProducao').value;
+        const valorUnitario = parseFloat(document.getElementById('valorUnitario').value) || 0;
+
+        if (!texto.trim()) {
+            alert('Digite ou cole a produção antes de salvar.');
+            return;
+        }
+
+        const linhas = texto.split('\n');
+        let totalPecas = 0;
+        let itensExtraidos = [];
+
+        linhas.forEach(linha => {
+            const numeroMatch = linha.match(/\d+/);
+            if (numeroMatch) {
+                const qtd = parseInt(numeroMatch[0], 10);
+                totalPecas += qtd;
+                itensExtraidos.push(linha.trim());
+            }
+        });
+
+        if (totalPecas === 0) {
+            alert('Não consegui identificar números de peças no texto.');
+            return;
+        }
+
+        const valorTotal = totalPecas * valorUnitario;
+
+        document.getElementById('previewPecas').innerText = totalPecas;
+        document.getElementById('previewValor').innerText = `R$ ${valorTotal.toFixed(2)}`;
+        document.getElementById('previewResult').style.display = 'block';
+
+        const dataHoje = new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+        
+        const registro = {
+            id: Date.now(),
+            data: dataHoje,
+            pecas: totalPecas,
+            valor: valorTotal,
+            detalhes: itensExtraidos
+        };
+
+        historico.push(registro);
+        localStorage.setItem('producao_travete', JSON.stringify(historico));
+
+        // Toca o som de confirmação satisfatório
+        tocarSomSucesso();
+
+        document.getElementById('textoProducao').value = '';
+        atualizarTela();
+    }
+
+    function atualizarTela() {
+        const listaDiv = document.getElementById('listaHistorico');
+        if (historico.length === 0) {
+            listaDiv.innerHTML = '<p style="color: #777; font-size: 0.9rem;">Nenhum lançamento registrado.</p>';
+            document.getElementById('totalGeralValor').innerText = 'R$ 0,00';
+            document.getElementById('totalGeralPecas').innerText = '0';
+            return;
+        }
+
+        let html = '';
+        let somaPecasGeral = 0;
+        let somaValorGeral = 0;
+
+        historico.forEach((item) => {
+            somaPecasGeral += item.pecas;
+            somaValorGeral += item.valor;
+
+            html += `
+                <div class="history-item">
+                    <div>
+                        <strong>${item.data}</strong> - ${item.pecas} pçs
+                        <ul>
+                            ${item.detalhes.map(d => `<li>${d}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <div style="font-weight: bold; color: var(--accent-color); white-space: nowrap; margin-left: 8px;">
+                        R$ ${item.valor.toFixed(2)}
+                    </div>
+                </div>
+            `;
+        });
+
+        listaDiv.innerHTML = html;
+        document.getElementById('totalGeralValor').innerText = `R$ ${somaValorGeral.toFixed(2)}`;
+        document.getElementById('totalGeralPecas').innerText = somaPecasGeral;
+    }
+
+    function limparHistorico() {
+        if (confirm('Deseja zerar todos os lançamentos da semana?')) {
+            historico = [];
+            localStorage.removeItem('producao_travete');
+            document.getElementById('previewResult').style.display = 'none';
+            atualizarTela();
+        }
+    }
+
+    // Registrar Service Worker para PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW falhou: ', err));
+        });
+    }
+</script>
+
+</body>
+</html>
