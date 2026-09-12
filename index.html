@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Controle de Travete</title>
     
-    <!-- Configurações de PWA para celular -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#121212">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -21,6 +20,7 @@
             --border-color: #333;
             --danger-color: #cf6679;
             --info-color: #2196F3;
+            --whatsapp-color: #25D366;
         }
 
         body {
@@ -98,6 +98,7 @@
             font-size: 1rem;
             font-weight: bold;
             cursor: pointer;
+            margin-top: 4px;
         }
 
         button:active {
@@ -143,19 +144,33 @@
 
         .btn-close-week {
             background-color: var(--info-color);
-            margin-top: 10px;
-            font-size: 0.9rem;
+            margin-top: 12px;
         }
         .btn-close-week:hover {
             background-color: #1976D2;
         }
 
+        .btn-whatsapp {
+            background-color: var(--whatsapp-color);
+            color: #fff;
+            font-size: 0.9rem;
+            padding: 10px;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-whatsapp:hover {
+            background-color: #20ba5a;
+        }
+
         .archive-box {
             background-color: #252525;
-            padding: 10px;
+            padding: 12px;
             border-radius: 8px;
-            margin-top: 8px;
-            font-size: 0.85rem;
+            margin-top: 10px;
+            font-size: 0.9rem;
             border-left: 4px solid var(--info-color);
         }
     </style>
@@ -164,7 +179,7 @@
 
 <div class="container">
     <h1>Controle de Travete</h1>
-    <p class="subtitle">Bloco de notas com histórico de semanas</p>
+    <p class="subtitle">Bloco de notas com histórico e WhatsApp</p>
 
     <!-- Bloco de Lançamento -->
     <div class="card">
@@ -196,12 +211,13 @@
             <strong>Total da Semana:</strong> <span id="totalGeralValor" style="color: var(--accent-color); font-size: 1.15rem; font-weight: bold;">R$ 0,00</span> (<span id="totalGeralPecas">0</span> pçs)
         </div>
 
-        <button class="btn-close-week" onclick="fecharSalvarSemana()">Fechar e Salvar Semana</button>
+        <button class="btn-whatsapp" onclick="enviarWhatsAppSemanaAtual()">📲 Enviar Resumo Atual via WhatsApp</button>
+        <button class="btn-close-week" onclick="fecharSalvarSemana()">🔒 Fechar e Salvar Semana no Histórico</button>
     </div>
 
     <!-- Consulta de Semanas Anteriores -->
     <div class="card" id="cardArquivo" style="display: none;">
-        <h3 style="margin-top:0; font-size: 1.1rem; color: var(--info-color);">Histórico de Semanas</h3>
+        <h3 style="margin-top:0; font-size: 1.1rem; color: var(--info-color);">Histórico de Semanas Fechadas</h3>
         <div id="listaArquivo"></div>
     </div>
 </div>
@@ -290,7 +306,6 @@
     function atualizarTela() {
         const listaDiv = document.getElementById('listaHistorico');
         
-        // Atualizar semana atual
         if (historico.length === 0) {
             listaDiv.innerHTML = '<p style="color: #777; font-size: 0.9rem;">Nenhum lançamento registrado.</p>';
             document.getElementById('totalGeralValor').innerText = 'R$ 0,00';
@@ -324,7 +339,7 @@
             document.getElementById('totalGeralPecas').innerText = somaPecasGeral;
         }
 
-        // Atualizar visualização do arquivo de semanas anteriores
+        // Renderizar arquivo de semanas passadas
         const cardArquivo = document.getElementById('cardArquivo');
         const listaArquivoDiv = document.getElementById('listaArquivo');
 
@@ -334,22 +349,67 @@
             cardArquivo.style.display = 'block';
             let arquivoHtml = '';
             
-            // Mostra da mais recente para a mais antiga
             arquivoSemanas.slice().reverse().forEach((semana) => {
                 arquivoHtml += `
                     <div class="archive-box">
-                        <div style="display: flex; justify-content: space-between; font-weight: bold;">
-                            <span>Fechamento: ${semana.periodo}</span>
+                        <div style="display: flex; justify-content: space-between; font-weight: bold; align-items: center;">
+                            <span>📅 ${semana.periodo}</span>
                             <span style="color: var(--accent-color);">R$ ${semana.valorTotal.toFixed(2)} (${semana.pecasTotal} pçs)</span>
                         </div>
-                        <div style="font-size: 0.8rem; color: #aaa; margin-top: 4px;">
-                            ${semana.quantidadeDias} dias lançados
-                        </div>
+                        <button class="btn-whatsapp" style="margin-top: 8px; font-size: 0.85rem; padding: 8px;" onclick="enviarWhatsAppSemanaPassada(${semana.id})">
+                            📲 Enviar esta semana por WhatsApp
+                        </button>
                     </div>
                 `;
             });
             listaArquivoDiv.innerHTML = arquivoHtml;
         }
+    }
+
+    function gerarTextoWhatsApp(periodoStr, listaRegistros, totalPecas, totalValor) {
+        let texto = `📋 *FECHAMENTO DE PRODUÇÃO*\n`;
+        texto += `📅 *Período:* ${periodoStr}\n`;
+        texto += `🔢 *Total de Peças:* ${totalPecas} pçs\n`;
+        texto += `💰 *Valor Total:* R$ ${totalValor.toFixed(2)}\n\n`;
+        texto += `*Lançamentos:* \n`;
+
+        listaRegistros.forEach(item => {
+            texto += `• *${item.data}* (${item.pecas} pçs - R$ ${item.valor.toFixed(2)})\n`;
+            item.detalhes.forEach(d => {
+                texto += `   - ${d}\n`;
+            });
+        });
+
+        return encodeURIComponent(texto);
+    }
+
+    function enviarWhatsAppSemanaAtual() {
+        if (historico.length === 0) {
+            alert('Não há registros na semana atual para enviar.');
+            return;
+        }
+
+        let somaPecas = 0;
+        let somaValor = 0;
+        historico.forEach(item => {
+            somaPecas += item.pecas;
+            somaValor += item.valor;
+        });
+
+        const primeiraData = historico[0].data;
+        const ultimaData = historico[historico.length - 1].data;
+        const periodoStr = `${primeiraData} até ${ultimaData}`;
+
+        const mensagem = gerarTextoWhatsApp(periodoStr, historico, somaPecas, somaValor);
+        window.open(`https://api.whatsapp.com/send?text=${mensagem}`, '_blank');
+    }
+
+    function enviarWhatsAppSemanaPassada(id) {
+        const semana = arquivoSemanas.find(s => s.id === id);
+        if (!semana) return;
+
+        const mensagem = gerarTextoWhatsApp(semana.periodo, semana.registros, semana.pecasTotal, semana.valorTotal);
+        window.open(`https://api.whatsapp.com/send?text=${mensagem}`, '_blank');
     }
 
     function fecharSalvarSemana() {
@@ -358,7 +418,7 @@
             return;
         }
 
-        if (confirm('Deseja fechar esta semana, salvar no histórico e começar uma nova semana?')) {
+        if (confirm('Deseja fechar esta semana, salvar no histórico e começar uma nova semana limpa?')) {
             let somaPecas = 0;
             let somaValor = 0;
 
@@ -383,13 +443,12 @@
             arquivoSemanas.push(semanaFechada);
             localStorage.setItem('producao_travete_arquivo', JSON.stringify(arquivoSemanas));
 
-            // Limpa a semana atual
             historico = [];
             localStorage.removeItem('producao_travete_atual');
             document.getElementById('previewResult').style.display = 'none';
 
             atualizarTela();
-            alert('Semana fechada e salva com sucesso no histórico!');
+            alert('Semana fechada e salva com sucesso!');
         }
     }
 
