@@ -20,6 +20,7 @@
             --accent-hover: #45a049;
             --border-color: #333;
             --danger-color: #cf6679;
+            --info-color: #2196F3;
         }
 
         body {
@@ -140,17 +141,22 @@
             border-bottom: none;
         }
 
-        .btn-clear {
-            background-color: transparent;
-            color: var(--danger-color);
-            border: 1px solid var(--danger-color);
+        .btn-close-week {
+            background-color: var(--info-color);
             margin-top: 10px;
-            font-size: 0.85rem;
-            padding: 10px;
+            font-size: 0.9rem;
+        }
+        .btn-close-week:hover {
+            background-color: #1976D2;
         }
 
-        .btn-clear:hover {
-            background-color: rgba(207, 102, 121, 0.1);
+        .archive-box {
+            background-color: #252525;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 8px;
+            font-size: 0.85rem;
+            border-left: 4px solid var(--info-color);
         }
     </style>
 </head>
@@ -158,7 +164,7 @@
 
 <div class="container">
     <h1>Controle de Travete</h1>
-    <p class="subtitle">Bloco de notas com cálculo e fechamento</p>
+    <p class="subtitle">Bloco de notas com histórico de semanas</p>
 
     <!-- Bloco de Lançamento -->
     <div class="card">
@@ -179,23 +185,28 @@
         </div>
     </div>
 
-    <!-- Fechamento Semanal -->
+    <!-- Semana Atual -->
     <div class="card">
-        <h3 style="margin-top:0; font-size: 1.1rem;">Fechamento Semanal</h3>
+        <h3 style="margin-top:0; font-size: 1.1rem;">Semana Atual</h3>
         <div id="listaHistorico">
             <p style="color: #777; font-size: 0.9rem;">Nenhum lançamento registrado.</p>
         </div>
         
         <div style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 12px; font-size: 1rem;">
-            <strong>Total Geral:</strong> <span id="totalGeralValor" style="color: var(--accent-color); font-size: 1.15rem; font-weight: bold;">R$ 0,00</span> (<span id="totalGeralPecas">0</span> pçs)
+            <strong>Total da Semana:</strong> <span id="totalGeralValor" style="color: var(--accent-color); font-size: 1.15rem; font-weight: bold;">R$ 0,00</span> (<span id="totalGeralPecas">0</span> pçs)
         </div>
 
-        <button class="btn-clear" onclick="limparHistorico()">Zerar Semana</button>
+        <button class="btn-close-week" onclick="fecharSalvarSemana()">Fechar e Salvar Semana</button>
+    </div>
+
+    <!-- Consulta de Semanas Anteriores -->
+    <div class="card" id="cardArquivo" style="display: none;">
+        <h3 style="margin-top:0; font-size: 1.1rem; color: var(--info-color);">Histórico de Semanas</h3>
+        <div id="listaArquivo"></div>
     </div>
 </div>
 
 <script>
-    // Sintetizador de Som Simples (Bip de Confirmação usando Web Audio API)
     function tocarSomSucesso() {
         try {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -203,8 +214,8 @@
             const gain = audioCtx.createGain();
             
             osc.type = 'sine';
-            osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // Nota D5
-            osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1); // Sobe para A5
+            osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); 
+            osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1); 
             
             gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
@@ -215,11 +226,13 @@
             osc.start();
             osc.stop(audioCtx.currentTime + 0.15);
         } catch (e) {
-            console.log("Áudio não suportado ou bloqueado pelo navegador.");
+            console.log("Áudio não suportado.");
         }
     }
 
-    let historico = JSON.parse(localStorage.getItem('producao_travete')) || [];
+    let historico = JSON.parse(localStorage.getItem('producao_travete_atual')) || [];
+    let arquivoSemanas = JSON.parse(localStorage.getItem('producao_travete_arquivo')) || [];
+    
     atualizarTela();
 
     function processarLancamento() {
@@ -266,9 +279,8 @@
         };
 
         historico.push(registro);
-        localStorage.setItem('producao_travete', JSON.stringify(historico));
+        localStorage.setItem('producao_travete_atual', JSON.stringify(historico));
 
-        // Toca o som de confirmação satisfatório
         tocarSomSucesso();
 
         document.getElementById('textoProducao').value = '';
@@ -277,51 +289,110 @@
 
     function atualizarTela() {
         const listaDiv = document.getElementById('listaHistorico');
+        
+        // Atualizar semana atual
         if (historico.length === 0) {
             listaDiv.innerHTML = '<p style="color: #777; font-size: 0.9rem;">Nenhum lançamento registrado.</p>';
             document.getElementById('totalGeralValor').innerText = 'R$ 0,00';
             document.getElementById('totalGeralPecas').innerText = '0';
+        } else {
+            let html = '';
+            let somaPecasGeral = 0;
+            let somaValorGeral = 0;
+
+            historico.forEach((item) => {
+                somaPecasGeral += item.pecas;
+                somaValorGeral += item.valor;
+
+                html += `
+                    <div class="history-item">
+                        <div>
+                            <strong>${item.data}</strong> - ${item.pecas} pçs
+                            <ul>
+                                ${item.detalhes.map(d => `<li>${d}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div style="font-weight: bold; color: var(--accent-color); white-space: nowrap; margin-left: 8px;">
+                            R$ ${item.valor.toFixed(2)}
+                        </div>
+                    </div>
+                `;
+            });
+
+            listaDiv.innerHTML = html;
+            document.getElementById('totalGeralValor').innerText = `R$ ${somaValorGeral.toFixed(2)}`;
+            document.getElementById('totalGeralPecas').innerText = somaPecasGeral;
+        }
+
+        // Atualizar visualização do arquivo de semanas anteriores
+        const cardArquivo = document.getElementById('cardArquivo');
+        const listaArquivoDiv = document.getElementById('listaArquivo');
+
+        if (arquivoSemanas.length === 0) {
+            cardArquivo.style.display = 'none';
+        } else {
+            cardArquivo.style.display = 'block';
+            let arquivoHtml = '';
+            
+            // Mostra da mais recente para a mais antiga
+            arquivoSemanas.slice().reverse().forEach((semana) => {
+                arquivoHtml += `
+                    <div class="archive-box">
+                        <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                            <span>Fechamento: ${semana.periodo}</span>
+                            <span style="color: var(--accent-color);">R$ ${semana.valorTotal.toFixed(2)} (${semana.pecasTotal} pçs)</span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #aaa; margin-top: 4px;">
+                            ${semana.quantidadeDias} dias lançados
+                        </div>
+                    </div>
+                `;
+            });
+            listaArquivoDiv.innerHTML = arquivoHtml;
+        }
+    }
+
+    function fecharSalvarSemana() {
+        if (historico.length === 0) {
+            alert('Não há registros na semana atual para fechar.');
             return;
         }
 
-        let html = '';
-        let somaPecasGeral = 0;
-        let somaValorGeral = 0;
+        if (confirm('Deseja fechar esta semana, salvar no histórico e começar uma nova semana?')) {
+            let somaPecas = 0;
+            let somaValor = 0;
 
-        historico.forEach((item) => {
-            somaPecasGeral += item.pecas;
-            somaValorGeral += item.valor;
+            historico.forEach(item => {
+                somaPecas += item.pecas;
+                somaValor += item.valor;
+            });
 
-            html += `
-                <div class="history-item">
-                    <div>
-                        <strong>${item.data}</strong> - ${item.pecas} pçs
-                        <ul>
-                            ${item.detalhes.map(d => `<li>${d}</li>`).join('')}
-                        </ul>
-                    </div>
-                    <div style="font-weight: bold; color: var(--accent-color); white-space: nowrap; margin-left: 8px;">
-                        R$ ${item.valor.toFixed(2)}
-                    </div>
-                </div>
-            `;
-        });
+            const primeiraData = historico[0].data;
+            const ultimaData = historico[historico.length - 1].data;
+            const periodoStr = `${primeiraData} até ${ultimaData}`;
 
-        listaDiv.innerHTML = html;
-        document.getElementById('totalGeralValor').innerText = `R$ ${somaValorGeral.toFixed(2)}`;
-        document.getElementById('totalGeralPecas').innerText = somaPecasGeral;
-    }
+            const semanaFechada = {
+                id: Date.now(),
+                periodo: periodoStr,
+                pecasTotal: somaPecas,
+                valorTotal: somaValor,
+                quantidadeDias: historico.length,
+                registros: historico
+            };
 
-    function limparHistorico() {
-        if (confirm('Deseja zerar todos os lançamentos da semana?')) {
+            arquivoSemanas.push(semanaFechada);
+            localStorage.setItem('producao_travete_arquivo', JSON.stringify(arquivoSemanas));
+
+            // Limpa a semana atual
             historico = [];
-            localStorage.removeItem('producao_travete');
+            localStorage.removeItem('producao_travete_atual');
             document.getElementById('previewResult').style.display = 'none';
+
             atualizarTela();
+            alert('Semana fechada e salva com sucesso no histórico!');
         }
     }
 
-    // Registrar Service Worker para PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW falhou: ', err));
